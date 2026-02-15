@@ -26,7 +26,7 @@ const AUTO_COLLAPSE_DELAY = DEFAULT_DURATION - 2000;
 const pillAlign = (pos: SileoPosition) =>
 	pos.includes("right") ? "right" : pos.includes("center") ? "center" : "left";
 const expandDir = (pos: SileoPosition) =>
-	pos.startsWith("top") ? "bottom" as const : "top" as const;
+	pos.startsWith("top") ? ("bottom" as const) : ("top" as const);
 
 /* ---------------------------------- Types --------------------------------- */
 
@@ -137,10 +137,8 @@ const createToast = (options: InternalSileoOptions) => {
 	const live = store.toasts.filter((t) => !t.exiting);
 	const merged = mergeOptions(options);
 
-	const prev = merged.id
-		? live.find((t) => t.id === merged.id)
-		: undefined;
-	const id = merged.id ?? generateId();
+	const id = merged.id ?? "sileo-default";
+	const prev = live.find((t) => t.id === id);
 	const item = buildSileoItem(merged, id, prev?.position);
 
 	if (prev) {
@@ -228,7 +226,6 @@ export function Toaster({
 	const [toasts, setToasts] = useState<SileoItem[]>(store.toasts);
 	const [activeId, setActiveId] = useState<string>();
 
-	// Refs - consolidated
 	const hoverRef = useRef(false);
 	const timersRef = useRef(new Map<string, number>());
 	const listRef = useRef(toasts);
@@ -243,13 +240,11 @@ export function Toaster({
 		>(),
 	);
 
-	// Update store on mount
 	useEffect(() => {
 		store.position = position;
 		store.options = options;
 	}, [position, options]);
 
-	// Memoized callbacks
 	const clearAllTimers = useCallback(() => {
 		for (const t of timersRef.current.values()) clearTimeout(t);
 		timersRef.current.clear();
@@ -273,7 +268,6 @@ export function Toaster({
 		}
 	}, []);
 
-	// Subscribe to store changes
 	useEffect(() => {
 		const listener: SileoListener = (next) => setToasts(next);
 		store.listeners.add(listener);
@@ -283,11 +277,9 @@ export function Toaster({
 		};
 	}, [clearAllTimers]);
 
-	// Manage timers based on toast changes
 	useEffect(() => {
 		listRef.current = toasts;
 
-		// Clean up timers and cached handlers for removed toasts
 		const toastKeys = new Set(toasts.map(timeoutKey));
 		const toastIds = new Set(toasts.map((t) => t.id));
 		for (const [key, timer] of timersRef.current) {
@@ -324,7 +316,6 @@ export function Toaster({
 		schedule(listRef.current);
 	}, [schedule]);
 
-	// Get latest toast ID
 	const latest = useMemo(() => {
 		for (let i = toasts.length - 1; i >= 0; i--) {
 			if (!toasts[i].exiting) return toasts[i].id;
@@ -337,7 +328,6 @@ export function Toaster({
 		setActiveId(latest);
 	}, [latest]);
 
-	// Get handlers for a toast - cached to prevent recreating
 	const getHandlers = useCallback((toastId: string) => {
 		let cached = handlersCache.current.get(toastId);
 		if (cached) return cached;
@@ -359,7 +349,6 @@ export function Toaster({
 		return cached;
 	}, []);
 
-	// Viewport style computation - memoized
 	const getViewportStyle = useCallback(
 		(pos: SileoPosition): CSSProperties | undefined => {
 			if (offset === undefined) return undefined;
@@ -383,7 +372,6 @@ export function Toaster({
 		[offset],
 	);
 
-	// Group toasts by position - optimized
 	const byPosition = useMemo(() => {
 		const map = {} as Partial<Record<SileoPosition, SileoItem[]>>;
 		for (const t of toasts) {

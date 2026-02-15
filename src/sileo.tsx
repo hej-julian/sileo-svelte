@@ -1,12 +1,4 @@
 import {
-	ArrowRightIcon,
-	CheckIcon,
-	CircleAlertIcon,
-	LifeBuoyIcon,
-	LoaderCircleIcon,
-	XIcon,
-} from "lucide-react";
-import {
 	type CSSProperties,
 	type MouseEventHandler,
 	memo,
@@ -19,7 +11,16 @@ import {
 	useRef,
 	useState,
 } from "react";
+import type { SileoButton, SileoState, SileoStyles } from "./types";
 import "./sileo.css";
+import {
+	ArrowRight,
+	Check,
+	CircleAlert,
+	LifeBuoy,
+	LoaderCircle,
+	X,
+} from "./icons";
 
 /* --------------------------------- Config --------------------------------- */
 
@@ -31,8 +32,6 @@ const PILL_PADDING = 10;
 const MIN_EXPAND_RATIO = 2.25;
 const SWAP_COLLAPSE_MS = 200;
 const HEADER_EXIT_MS = 150;
-
-import type { SileoButton, SileoState, SileoStyles } from "./types";
 
 type State = SileoState;
 
@@ -72,59 +71,15 @@ interface SileoProps {
 /* ---------------------------------- Icons --------------------------------- */
 
 const STATE_ICON: Record<State, ReactNode> = {
-	success: <CheckIcon size={16} />,
-	loading: (
-		<LoaderCircleIcon size={16} data-sileo-icon="spin" aria-hidden="true" />
-	),
-	error: <XIcon size={16} />,
-	warning: <CircleAlertIcon size={16} />,
-	info: <LifeBuoyIcon size={16} />,
-	action: <ArrowRightIcon size={16} />,
+	success: <Check />,
+	loading: <LoaderCircle data-sileo-icon="spin" aria-hidden="true" />,
+	error: <X />,
+	warning: <CircleAlert />,
+	info: <LifeBuoy />,
+	action: <ArrowRight />,
 };
 
-/* ----------------------------- Sub-components ----------------------------- */
-
-const HeaderInner = memo(function HeaderInner({
-	innerRef,
-	layer,
-	isExiting,
-}: {
-	innerRef?: React.RefObject<HTMLDivElement | null>;
-	layer: { key: string; view: View };
-	isExiting?: boolean;
-}) {
-	const { view } = layer;
-	return (
-		<div
-			ref={innerRef}
-			key={layer.key}
-			data-sileo-header-inner
-			data-layer={isExiting ? "prev" : "current"}
-			data-exiting={isExiting || undefined}
-		>
-			<div
-				data-sileo-badge
-				data-state={view.state}
-				className={view.styles?.badge}
-			>
-				{view.icon ?? STATE_ICON[view.state]}
-			</div>
-			<span
-				data-sileo-title
-				data-state={view.state}
-				className={view.styles?.title}
-			>
-				{view.title}
-			</span>
-		</div>
-	);
-});
-
 /* ----------------------------- Memoised Defs ------------------------------ */
-/* The gooey filter <defs> never changes after mount — memoising it prevents
-   React from diffing the filter node tree on every toast state update.
-   `color-interpolation-filters="sRGB"` avoids the default linearRGB
-   conversion which doubles the work (gamma encode → blur → decode). */
 const GooeyDefs = memo(function GooeyDefs({
 	filterId,
 	blur,
@@ -185,7 +140,7 @@ export const Sileo = memo(function Sileo({
 	);
 
 	const [view, setView] = useState<View>(next);
-	const [_, setApplied] = useState(refreshKey);
+	const [applied, setApplied] = useState(refreshKey);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [ready, setReady] = useState(false);
 	const [pillWidth, setPillWidth] = useState(0);
@@ -197,10 +152,7 @@ export const Sileo = memo(function Sileo({
 		? false
 		: (canExpand ?? (!interruptKey || interruptKey === id));
 
-	// Key for AnimatePresence crossfade — changes when title or state changes
 	const headerKey = `${view.state}-${view.title}`;
-
-	// Unique filter ID per toast instance to prevent SVG filter collisions
 	const filterId = `sileo-gooey-${id}`;
 	const resolvedRoundness = Math.max(0, roundness ?? DEFAULT_ROUNDNESS);
 	const blur = resolvedRoundness * BLUR_RATIO;
@@ -224,11 +176,11 @@ export const Sileo = memo(function Sileo({
 
 	const headerPadRef = useRef<number | null>(null);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: headerLayer.current.key is used to force a re-render
 	useLayoutEffect(() => {
 		const el = innerRef.current;
 		const header = headerRef.current;
 		if (!el || !header) return;
-		// Read padding once — it's set by CSS and doesn't change.
 		if (headerPadRef.current === null) {
 			const cs = getComputedStyle(header);
 			headerPadRef.current =
@@ -245,7 +197,7 @@ export const Sileo = memo(function Sileo({
 		const ro = new ResizeObserver(measure);
 		ro.observe(el);
 		return () => ro.disconnect();
-	}, []);
+	}, [headerLayer.current.key]);
 
 	useLayoutEffect(() => {
 		if (!hasDesc) {
@@ -321,7 +273,6 @@ export const Sileo = memo(function Sileo({
 		if (open) {
 			pendingRef.current = { key: refreshKey, payload: next };
 			setIsExpanded(false);
-			// Don't wait for full collapse transition — swap content after a short delay
 			swapTimerRef.current = window.setTimeout(() => {
 				swapTimerRef.current = null;
 				const pending = pendingRef.current;
@@ -339,6 +290,7 @@ export const Sileo = memo(function Sileo({
 
 	/* ----------------------------- Auto expand/collapse ----------------------- */
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: applied is used to force a re-render
 	useEffect(() => {
 		if (!hasDesc) return;
 
@@ -375,19 +327,22 @@ export const Sileo = memo(function Sileo({
 			if (autoExpandRef.current) clearTimeout(autoExpandRef.current);
 			if (autoCollapseRef.current) clearTimeout(autoCollapseRef.current);
 		};
-	}, [autoCollapseDelayMs, autoExpandDelayMs, hasDesc, allowExpand, exiting]);
+	}, [
+		autoCollapseDelayMs,
+		autoExpandDelayMs,
+		hasDesc,
+		allowExpand,
+		exiting,
+		applied,
+	]);
 
 	/* ------------------------------ Derived values ---------------------------- */
 
 	const minExpanded = HEIGHT * MIN_EXPAND_RATIO;
-	// Use minExpanded for all toasts to ensure consistent scaling/roundness
 	const rawExpanded = hasDesc
 		? Math.max(minExpanded, HEIGHT + contentHeight)
 		: minExpanded;
 
-	// Freeze the expanded height while collapsed so a mid-transition content
-	// swap doesn't cause the pill height to jump and produce a double-spring.
-	// Only update when expanded (open) or when there's no description.
 	const frozenExpandedRef = useRef(rawExpanded);
 	if (open) {
 		frozenExpandedRef.current = rawExpanded;
@@ -407,27 +362,34 @@ export const Sileo = memo(function Sileo({
 
 	/* ------------------------------- Inline styles ---------------------------- */
 
-	const css = useMemo(() => {
-		const yShift = open ? (expand === "bottom" ? 3 : -3) : 0;
-		return {
-			viewport: { height: open ? expanded : HEIGHT } as CSSProperties,
-			pill: {
-				transform: `scaleY(${open ? 1 : HEIGHT / expanded})`,
-				width: resolvedPillWidth,
-				height: open ? expanded - 5 : expanded,
-			} as CSSProperties,
-			body: {
-				transform: `scaleY(${open ? 1 : 0})`,
-				opacity: open ? 1 : 0,
-			} as CSSProperties,
-			header: {
-				left: pillX,
-				transform: `translateY(${yShift}px) scale(${open ? 0.9 : 1})`,
-				"--sileo-pill-width": `${resolvedPillWidth}px`,
-			} as CSSProperties,
-			content: { opacity: open ? 1 : 0 } as CSSProperties,
-		};
-	}, [open, expanded, resolvedPillWidth, pillX, expand]);
+	const viewport = useMemo<CSSProperties>(
+		() => ({ height: open ? expanded : HEIGHT }),
+		[open, expanded],
+	);
+	const pill = useMemo<CSSProperties>(
+		() => ({
+			transform: `scaleY(${open ? 1 : HEIGHT / expanded})`,
+			width: resolvedPillWidth,
+			height: open ? expanded - 5 : expanded,
+		}),
+		[open, expanded, resolvedPillWidth],
+	);
+	const body = useMemo<CSSProperties>(
+		() => ({ transform: `scaleY(${open ? 1 : 0})`, opacity: open ? 1 : 0 }),
+		[open],
+	);
+	const header = useMemo(
+		() => ({
+			left: pillX,
+			transform: `translateY(${open ? (expand === "bottom" ? 3 : -3) : 0}px) scale(${open ? 0.9 : 1})`,
+			"--sileo-pill-width": `${resolvedPillWidth}px`,
+		}),
+		[pillX, open, expand, resolvedPillWidth],
+	);
+	const contentStyle = useMemo<CSSProperties>(
+		() => ({ opacity: open ? 1 : 0 }),
+		[open],
+	);
 
 	/* -------------------------------- Handlers -------------------------------- */
 
@@ -453,7 +415,6 @@ export const Sileo = memo(function Sileo({
 				if (e.propertyName !== "height" && e.propertyName !== "transform")
 					return;
 				if (open) return;
-				// Fallback: if the swap timer hasn't fired yet, flush now
 				const pending = pendingRef.current;
 				if (!pending) return;
 				if (swapTimerRef.current) {
@@ -480,12 +441,11 @@ export const Sileo = memo(function Sileo({
 			data-position={position}
 			data-state={view.state}
 			className={className}
-			style={css.viewport}
+			style={viewport}
 			onMouseEnter={handleEnter}
 			onMouseLeave={handleLeave}
 			onTransitionEnd={handleTransitionEnd}
 		>
-			{/* SVG Gooey */}
 			<div data-sileo-canvas data-edge={expand}>
 				<svg
 					data-sileo-svg
@@ -502,7 +462,7 @@ export const Sileo = memo(function Sileo({
 							rx={resolvedRoundness}
 							ry={resolvedRoundness}
 							fill={view.fill}
-							style={css.pill}
+							style={pill}
 						/>
 						<rect
 							data-sileo-body
@@ -512,23 +472,59 @@ export const Sileo = memo(function Sileo({
 							rx={resolvedRoundness}
 							ry={resolvedRoundness}
 							fill={view.fill}
-							style={css.body}
+							style={body}
 						/>
 					</g>
 				</svg>
 			</div>
 
-			{/* Header with morphing content */}
-			<div
-				ref={headerRef}
-				data-sileo-header
-				data-edge={expand}
-				style={css.header}
-			>
+			<div ref={headerRef} data-sileo-header data-edge={expand} style={header}>
 				<div data-sileo-header-stack>
-					<HeaderInner innerRef={innerRef} layer={headerLayer.current} />
+					<div
+						ref={innerRef}
+						key={headerLayer.current.key}
+						data-sileo-header-inner
+						data-layer="current"
+					>
+						<div
+							data-sileo-badge
+							data-state={headerLayer.current.view.state}
+							className={headerLayer.current.view.styles?.badge}
+						>
+							{headerLayer.current.view.icon ??
+								STATE_ICON[headerLayer.current.view.state]}
+						</div>
+						<span
+							data-sileo-title
+							data-state={headerLayer.current.view.state}
+							className={headerLayer.current.view.styles?.title}
+						>
+							{headerLayer.current.view.title}
+						</span>
+					</div>
 					{headerLayer.prev && (
-						<HeaderInner layer={headerLayer.prev} isExiting />
+						<div
+							key={headerLayer.prev.key}
+							data-sileo-header-inner
+							data-layer="prev"
+							data-exiting="true"
+						>
+							<div
+								data-sileo-badge
+								data-state={headerLayer.prev.view.state}
+								className={headerLayer.prev.view.styles?.badge}
+							>
+								{headerLayer.prev.view.icon ??
+									STATE_ICON[headerLayer.prev.view.state]}
+							</div>
+							<span
+								data-sileo-title
+								data-state={headerLayer.prev.view.state}
+								className={headerLayer.prev.view.styles?.title}
+							>
+								{headerLayer.prev.view.title}
+							</span>
+						</div>
 					)}
 				</div>
 			</div>
@@ -538,7 +534,7 @@ export const Sileo = memo(function Sileo({
 					data-sileo-content
 					data-edge={expand}
 					data-visible={open}
-					style={css.content}
+					style={contentStyle}
 				>
 					<div
 						ref={contentRef}
@@ -547,7 +543,7 @@ export const Sileo = memo(function Sileo({
 					>
 						{view.description}
 						{view.button && (
-							// biome-ignore lint/a11y/useValidAnchor: Button is nested inside outer <button>
+							// biome-ignore lint/a11y/useValidAnchor: cannot use button inside a button
 							<a
 								href="#"
 								data-sileo-button
