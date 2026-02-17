@@ -5,7 +5,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/hiaaryan/sileo.git"
+		"url": "https://github.com/hej-julian/sileo-svelte.git"
 	},
 	"exports": {
 		".": {
